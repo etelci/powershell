@@ -1,0 +1,86 @@
+# Yönetici olarak çalıştırdığınızdan emin olun
+
+# PrintManagement modülünü içe aktarın (Windows 8 ve üzeri için)
+Import-Module PrintManagement
+
+# Yüklü yazıcıları ve durumlarını listele
+$printers = Get-Printer
+
+if ($printers) {
+    Write-Host "Yüklü yazıcılar ve durumları:"
+    foreach ($printer in $printers) {
+        $status = switch ($printer.PrinterStatus) {
+            0 { "Hazır Değil" }
+            1 { "Diğer" }
+            2 { "Bilinmiyor" }
+            3 { "Boşta" }
+            4 { "Yazdırılıyor" }
+            5 { "Isınıyor" }
+            6 { "Yazdırma Durduruldu" }
+            Default { "Durum Bilinmiyor" }
+        }
+        Write-Host "Adı: $($printer.Name), Durum: $status"
+    }
+} else {
+    Write-Host "Herhangi bir yazıcı bulunamadı."
+}
+
+# Çevrimdışı veya sorunlu yazıcıları kontrol et
+$problemPrinters = $printers | Where-Object { $_.PrinterStatus -ne 3 } # 3 = Boşta
+
+if ($problemPrinters) {
+    Write-Host "Sorunlu yazıcılar tespit edildi:"
+    foreach ($printer in $problemPrinters) {
+        $status = switch ($printer.PrinterStatus) {
+            0 { "Hazır Değil" }
+            1 { "Diğer" }
+            2 { "Bilinmiyor" }
+            3 { "Boşta" }
+            4 { "Yazdırılıyor" }
+            5 { "Isınıyor" }
+            6 { "Yazdırma Durduruldu" }
+            Default { "Durum Bilinmiyor" }
+        }
+        Write-Host "Adı: $($printer.Name), Durum: $status"
+    }
+    
+    # Yazdırma Biriktiricisi (Print Spooler) hizmetini yeniden başlatmayı teklif et
+    Write-Host "Yazdırma Biriktiricisi hizmetini yeniden başlatmak istiyor musunuz? (E/H)"
+    $input = Read-Host
+    if ($input -eq "E") {
+        Restart-Service -Name "Spooler"
+        Write-Host "Yazdırma Biriktiricisi hizmeti yeniden başlatıldı."
+    } else {
+        Write-Host "Yazdırma Biriktiricisi hizmeti yeniden başlatılmadı."
+    }
+} else {
+    Write-Host "Tüm yazıcılar düzgün çalışıyor."
+}
+
+# Yazdırma kuyruğunu kontrol et ve gerekirse temizle
+$printJobs = Get-PrintJob
+
+if ($printJobs) {
+    Write-Host "Bekleyen yazdırma işleri tespit edildi:"
+    $printJobs | Format-Table PrinterName, DocumentName, JobStatus
+    Write-Host "Yazdırma kuyruğunu temizlemek istiyor musunuz? (E/H)"
+    $input = Read-Host
+    if ($input -eq "E") {
+        $printJobs | Remove-PrintJob
+        Write-Host "Yazdırma kuyruğu temizlendi."
+    } else {
+        Write-Host "Yazdırma kuyruğu temizlenmedi."
+    }
+} else {
+    Write-Host "Yazdırma kuyruğunda bekleyen iş yok."
+}
+
+# Yazıcı bağlantı noktalarını kontrol et
+$printerPorts = Get-PrinterPort
+
+if ($printerPorts) {
+    Write-Host "Yazıcı bağlantı noktaları:"
+    $printerPorts | Format-Table Name, PrinterHostAddress
+} else {
+    Write-Host "Herhangi bir yazıcı bağlantı noktası bulunamadı."
+}

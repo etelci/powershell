@@ -1,18 +1,27 @@
-# OpenVPN hizmetinin durumunu kontrol et
-$service = Get-Service -Name "OpenVPNService" -ErrorAction SilentlyContinue
+# Yönetici olarak çalıştırılıp çalıştırılmadığını kontrol et
+if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)) {
+    Write-Host "Bu script'i yönetici olarak çalıştırmalısınız. Lütfen PowerShell'i 'Yönetici olarak çalıştır'(Run as Administrator) seçeneğiyle yeniden başlatın."
+    exit
+}
 
-if ($service -eq $null) {
-    Write-Host "OpenVPN hizmeti yüklü değil."
-} else {
-    if ($service.Status -eq "Running") {
-        Write-Host "OpenVPN hizmeti çalışıyor."
+# OpenVPN Hizmetlerini kontrol et ve gerekirse başlat
+$services = @("OpenVPNService", "OpenVPNServiceInteractive")
+
+foreach ($serviceName in $services) {
+    $service = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
+    if ($service -eq $null) {
+        Write-Host "$serviceName hizmeti yüklü değil."
     } else {
-        Write-Host "OpenVPN hizmeti çalışmıyor. Hizmeti başlatmayı deniyorum..."
-        try {
-            Start-Service -Name "OpenVPNService"
-            Write-Host "OpenVPN hizmeti başarıyla başlatıldı."
-        } catch {
-            Write-Host "OpenVPN hizmeti başlatılamadı: $($_.Exception.Message)"
+        if ($service.Status -eq "Running") {
+            Write-Host "$serviceName hizmeti çalışıyor."
+        } else {
+            Write-Host "$serviceName hizmeti çalışmıyor. Hizmeti başlatmayı deniyorum..."
+            try {
+                Start-Service -Name $serviceName -ErrorAction Stop
+                Write-Host "$serviceName hizmeti başarıyla başlatıldı."
+            } catch {
+                Write-Host "$serviceName hizmeti başlatılamadı: $($_.Exception.Message)"
+            }
         }
     }
 }
@@ -27,7 +36,7 @@ if ($process -eq $null) {
     Write-Host "OpenVPN GUI çalışıyor."
 }
 
-# Olası hata mesajlarını kontrol etmek için Windows Olay Günlüğü'nü(Event Viewer) incele
+# Olası hata mesajlarını kontrol etmek için Windows Olay Günlüğü'nü incele
 $events = Get-WinEvent -LogName Application -FilterXPath "*[System[Provider[@Name='OpenVPN']]]" -ErrorAction SilentlyContinue
 
 if ($events) {

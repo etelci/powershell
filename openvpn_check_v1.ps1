@@ -36,7 +36,7 @@ if ($process -eq $null) {
     Write-Host "OpenVPN GUI çalışıyor."
 }
 
-# Olası hata mesajlarını kontrol etmek için Windows Olay Günlüğü'nü incele
+# Olası hata mesajlarını kontrol etmek için Windows Olay Günlüğü'nü(Event Viewer) incele
 $events = Get-WinEvent -LogName Application -FilterXPath "*[System[Provider[@Name='OpenVPN']]]" -ErrorAction SilentlyContinue
 
 if ($events) {

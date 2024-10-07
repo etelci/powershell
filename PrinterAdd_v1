@@ -1,0 +1,84 @@
+# Execution Policy ayarını değiştir
+$originalPolicy = Get-ExecutionPolicy
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned -Force
+
+try {
+    # Kullanıcıdan gerekli bilgileri al ve kontrol et
+
+    # Yazıcı Adı Alımı
+    do {
+        $printerName = Read-Host "Yazıcınıza vermek istediğiniz ismi girin (örneğin: Ofis, Ofis Yazıcısı, Muhasebe)"
+        $printerName = $printerName.Trim()
+
+        if ([string]::IsNullOrWhiteSpace($printerName)) {
+            Write-Host "Yazıcı ismi boş bırakılamaz. Lütfen geçerli bir isim girin." -ForegroundColor Red
+        }
+    } while ([string]::IsNullOrWhiteSpace($printerName))
+
+    # Türkçe karakterleri düzelt
+    $printerName = $printerName -replace "İ", "I" -replace "ı", "i" -replace "Ğ", "G" -replace "ğ", "g" -replace "Ü", "U" -replace "ü", "u" -replace "Ş", "S" -replace "ş", "s" -replace "Ö", "O" -replace "ö", "o" -replace "Ç", "C" -replace "ç", "c"
+
+    # Yazıcı IP Adresi Alımı - Bu bölüm DHCP'den mac atamayla da çözülebilir
+    do {
+        $printerIP = Read-Host "Yazıcının IP adresini girin (örneğin: 192.168.1.100)"
+        $printerIP = $printerIP.Trim()
+
+        if ([string]::IsNullOrWhiteSpace($printerIP)) {
+            Write-Host "IP adresi boş bırakılamaz. Lütfen geçerli bir IP adresi girin." -ForegroundColor Red
+        } elseif (-not [System.Net.IPAddress]::TryParse($printerIP, [ref]$null)) {
+            Write-Host "Geçersiz IP adresi formatı. Lütfen doğru bir IP adresi girin." -ForegroundColor Red
+            $printerIP = $null
+        }
+    } while ([string]::IsNullOrWhiteSpace($printerIP))
+
+    # Mevcut yazıcı sürücülerini listele
+    Write-Host "`nMevcut yazıcı sürücüleri listeleniyor..." -ForegroundColor Green
+    $drivers = Get-PrinterDriver | Select-Object Name
+
+    if ($drivers.Count -eq 0) {
+        Write-Host "Sistemde yüklü yazıcı sürücüsü bulunamadı. Lütfen yazıcı sürücünüzü yükleyin ve tekrar deneyin." -ForegroundColor Red
+        exit
+    } else {
+        $drivers | ForEach-Object { Write-Host $_.Name }
+    }
+
+    # Yazıcı Sürücüsü Alımı
+    do {
+        $printerDriver = Read-Host "`nYukarıdaki listeden kullanmak istediğiniz yazıcı sürücüsünün tam adını kopyalayıp yapıştırın"
+        $printerDriver = $printerDriver.Trim()
+
+        if ([string]::IsNullOrWhiteSpace($printerDriver)) {
+            Write-Host "Yazıcı sürücüsü adı boş bırakılamaz. Lütfen geçerli bir sürücü adı girin." -ForegroundColor Red
+        } elseif (-not ($drivers.Name -contains $printerDriver)) {
+            Write-Host "Girilen sürücü adı listede bulunamadı. Lütfen listeden bir sürücü adı seçin." -ForegroundColor Red
+            $printerDriver = $null
+        }
+    } while ([string]::IsNullOrWhiteSpace($printerDriver))
+
+    # Port ismi oluştur
+    $printerPortName = "IP_$printerIP"
+
+    # Yeni bir TCP/IP yazıcı portu oluştur
+    Write-Host "`nYazıcı portu oluşturuluyor..." -ForegroundColor Green
+    if (-not (Get-PrinterPort -Name $printerPortName -ErrorAction SilentlyContinue)) {
+        Add-PrinterPort -Name $printerPortName -PrinterHostAddress $printerIP
+    } else {
+        Write-Host "Port zaten mevcut, atlanıyor." -ForegroundColor Yellow
+    }
+
+    # Yazıcıyı ekle
+    Write-Host "Yazıcı ekleniyor..." -ForegroundColor Green
+    if (-not (Get-Printer -Name $printerName -ErrorAction SilentlyContinue)) {
+        Add-Printer -Name $printerName -DriverName $printerDriver -PortName $printerPortName
+        Write-Host "`nYazıcı başarıyla eklendi!" -ForegroundColor Cyan
+    } else {
+        Write-Host "Bu isimde bir yazıcı zaten mevcut. Lütfen farklı bir isim deneyin." -ForegroundColor Red
+    }
+}
+catch {
+    Write-Host "Bir hata oluştu: $_" -ForegroundColor Red
+}
+finally {
+    # Execution Policy ayarını eski haline getir
+    Set-ExecutionPolicy -Scope Process -ExecutionPolicy $originalPolicy -Force
+}
